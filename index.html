@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>ConvoRAG — Conversation Intelligence</title>
+<style>
+:root {
+  --bg: #080c14;
+  --surface: #0f1520;
+  --surface2: #151d2e;
+  --border: #1c2840;
+  --accent: #4f6ef7;
+  --accent2: #7c3aed;
+  --cyan: #06b6d4;
+  --green: #10b981;
+  --amber: #f59e0b;
+  --text: #e2eaf8;
+  --muted: #8b97b8;
+  --faint: #2a3550;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh}
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--faint);border-radius:3px}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+/* ─ Layout ─ */
+#app{display:flex;flex-direction:column;height:100vh}
+header{background:rgba(8,12,20,.96);backdrop-filter:blur(10px);border-bottom:1px solid var(--border);padding:14px 28px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;z-index:100}
+.brand{display:flex;align-items:center;gap:12px}
+.brand-icon{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:800;color:#fff}
+.brand-name{font-size:18px;font-weight:800;letter-spacing:-.5px}
+.brand-sub{font-size:11px;color:var(--muted);margin-top:1px}
+.nav{display:flex;gap:4px}
+.nav-btn{padding:8px 16px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-size:13px;font-weight:500;transition:.15s}
+.nav-btn.active{background:linear-gradient(135deg,var(--accent),var(--accent2));border-color:transparent;color:#fff}
+
+/* ─ Panels ─ */
+main{flex:1;overflow-y:auto;padding:24px 28px;max-width:1200px;margin:0 auto;width:100%}
+.panel{display:none;flex-direction:column;gap:18px;animation:fadeIn .25s ease}
+.panel.active{display:flex}
+
+/* ─ Section header ─ */
+.sec-head{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px}
+.sec-title{font-size:20px;font-weight:800;color:#f0f6ff}
+.sec-desc{font-size:13px;color:var(--muted);margin-top:4px;line-height:1.6}
+
+/* ─ Cards ─ */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px}
+.card-head{display:flex;align-items:center;gap:8px;margin-bottom:14px}
+.card-icon{font-size:16px}
+.card-title{font-size:14px;font-weight:700;color:#c5d0e8}
+.pill{margin-left:auto;background:var(--faint);color:var(--muted);font-size:11px;font-weight:700;padding:2px 9px;border-radius:99px}
+
+/* ─ Buttons ─ */
+.btn{padding:9px 18px;border-radius:9px;border:none;cursor:pointer;font-size:13px;font-weight:600;transition:.15s;white-space:nowrap;font-family:inherit}
+.btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff}
+.btn-cyan{background:var(--cyan);color:#fff}
+.btn-green{background:var(--green);color:#fff}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+
+/* ─ Progress ─ */
+.progress{height:5px;background:var(--faint);border-radius:99px;overflow:hidden;margin:-4px 0 4px}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .4s ease;border-radius:99px}
+
+/* ─ Info box ─ */
+.info-box{display:flex;gap:14px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px;font-size:13px;color:var(--muted);line-height:1.7;align-items:flex-start}
+
+/* ─ Grid ─ */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+
+/* ─ List items ─ */
+.scroll-list{display:flex;flex-direction:column;gap:7px;max-height:420px;overflow-y:auto;padding-right:4px}
+.list-item{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px 13px;cursor:pointer;transition:border-color .15s}
+.list-item:hover{border-color:var(--faint)}
+.list-item.open{border-color:var(--accent)}
+.item-head{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.badge{font-size:11px;font-weight:700;padding:2px 9px;border-radius:99px}
+.badge-purple{background:rgba(79,110,247,.15);color:#818cf8}
+.badge-cyan{background:rgba(6,182,212,.12);color:#22d3ee}
+.badge-green{background:rgba(16,185,129,.12);color:#34d399}
+.msg-range{font-size:11px;color:#374562;margin-left:auto}
+.item-title{font-size:13px;font-weight:600;color:#d4ddf0}
+.item-body{font-size:12px;color:var(--muted);margin-top:9px;line-height:1.65;border-top:1px solid var(--border);padding-top:9px}
+.empty-state{color:#374562;font-size:13px;text-align:center;padding:24px 0}
+
+/* ─ Query ─ */
+.query-row{display:flex;gap:10px;margin-bottom:10px}
+input,textarea{background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:10px 14px;color:var(--text);font-size:14px;outline:none;font-family:inherit;width:100%}
+input:focus,textarea:focus{border-color:var(--accent)}
+.answer-box{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px;margin-top:6px;animation:fadeIn .2s ease}
+.answer-label{font-size:10px;font-weight:800;letter-spacing:.1em;color:var(--accent);text-transform:uppercase;margin-bottom:8px}
+.answer-text{font-size:14px;color:#c5d0e8;line-height:1.75}
+
+/* ─ Thinking ─ */
+.thinking{display:flex;align-items:center;gap:8px;font-size:12px;color:#374562;padding:6px 0}
+.dot-spin{width:14px;height:14px;border:2px solid var(--faint);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
+
+/* ─ Persona ─ */
+.persona-banner{background:linear-gradient(135deg,rgba(79,110,247,.1),rgba(124,58,237,.07));border:1px solid rgba(79,110,247,.2);border-radius:14px;padding:20px 22px}
+.banner-label{font-size:10px;font-weight:800;color:#818cf8;letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px}
+.banner-text{font-size:15px;color:var(--text);line-height:1.75}
+.banner-life{font-size:13px;color:var(--muted);margin-top:10px;line-height:1.6}
+.persona-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.p-card{background:var(--surface);border:1px solid;border-radius:12px;padding:16px}
+.p-card-title{font-size:13px;font-weight:700;color:#c5d0e8;margin-bottom:12px;display:flex;gap:7px;align-items:center}
+.p-list{list-style:none;display:flex;flex-direction:column;gap:7px}
+.p-list li{font-size:13px;color:var(--muted);display:flex;gap:8px;line-height:1.5;align-items:flex-start}
+.dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;margin-top:4px}
+.comm-row{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px}
+.comm-chip{background:var(--surface2);border-radius:9px;padding:10px 14px;min-width:130px}
+.comm-key{font-size:10px;color:#374562;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}
+.comm-val{font-size:13px;color:#c5d0e8}
+.tags{display:flex;flex-wrap:wrap;gap:7px;margin-top:6px}
+.tag{font-size:12px;background:rgba(124,58,237,.1);color:#a78bfa;padding:3px 11px;border-radius:99px;border:1px solid rgba(124,58,237,.2)}
+
+/* ─ Chat ─ */
+#chat-panel{height:calc(100vh - 76px);overflow:hidden;padding:0}
+.chat-wrap{display:flex;flex-direction:column;height:100%;background:var(--surface);border-left:1px solid var(--border);border-right:1px solid var(--border)}
+.chat-top{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--border);background:rgba(8,12,20,.8);flex-shrink:0}
+.chat-ava{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:17px;color:#fff;flex-shrink:0;font-weight:700}
+.chat-name{font-weight:700;color:#f0f6ff;font-size:14px}
+.chat-status{font-size:11px;color:#374562;margin-top:2px}
+.chat-msgs{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:14px}
+.welcome{display:flex;flex-direction:column;align-items:center;padding:24px 0;gap:8px}
+.welcome-title{font-size:16px;font-weight:700;color:#c5d0e8}
+.welcome-sub{font-size:13px;color:#374562}
+.chips{display:flex;flex-wrap:wrap;gap:7px;justify-content:center;margin-top:10px}
+.chip{font-size:12px;color:#818cf8;background:rgba(79,110,247,.08);border:1px solid rgba(79,110,247,.18);border-radius:99px;padding:6px 14px;cursor:pointer;transition:.15s}
+.chip:hover{background:rgba(79,110,247,.15)}
+.msg{display:flex;align-items:flex-end;gap:9px;animation:fadeIn .2s ease}
+.msg.user{flex-direction:row-reverse}
+.msg-ava{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:13px;color:#fff;flex-shrink:0;font-weight:700}
+.bubble{max-width:72%;padding:11px 15px;border-radius:14px;font-size:14px;line-height:1.65;white-space:pre-wrap}
+.bubble.user{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border-bottom-right-radius:4px}
+.bubble.bot{background:var(--surface2);color:var(--text);border-bottom-left-radius:4px}
+.typing{background:var(--surface2);border-radius:14px;border-bottom-left-radius:4px;padding:12px 18px;display:flex;gap:5px;align-items:center}
+.typing span{width:7px;height:7px;background:var(--muted);border-radius:50%;animation:pulse 1.2s ease infinite}
+.typing span:nth-child(2){animation-delay:.2s}
+.typing span:nth-child(3){animation-delay:.4s}
+.chat-bar{display:flex;gap:10px;padding:14px 18px;border-top:1px solid var(--border);background:rgba(8,12,20,.8);flex-shrink:0}
+.chat-bar input{flex:1}
+.send-btn{width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;color:#fff;cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:.15s}
+.send-btn:disabled{background:var(--faint);color:#374562;cursor:not-allowed}
+
+/* ─ Status badge ─ */
+.status-bar{display:flex;gap:10px;flex-wrap:wrap}
+.stat{font-size:12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:6px 12px;color:var(--muted)}
+.stat span{color:var(--text);font-weight:600}
+
+/* ─ Loading card ─ */
+.load-card{display:flex;align-items:center;gap:16px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px 20px}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="brand">
+      <div class="brand-icon">◈</div>
+      <div>
+        <div class="brand-name">ConvoRAG</div>
+        <div class="brand-sub" id="stats-bar">Loading…</div>
+      </div>
+    </div>
+    <nav class="nav">
+      <button class="nav-btn active" onclick="setTab('rag')">🗂 RAG System</button>
+      <button class="nav-btn" onclick="setTab('persona')">🧠 Persona</button>
+      <button class="nav-btn" onclick="setTab('chat')">💬 Chatbot</button>
+    </nav>
+  </header>
+
+  <!-- RAG Panel -->
+  <main id="rag-panel" class="panel active">
+    <div class="sec-head">
+      <div>
+        <div class="sec-title">RAG System with Checkpoints</div>
+        <div class="sec-desc" id="rag-desc">Processes conversations chronologically, detects topic shifts, and summarizes every 100 messages.</div>
+      </div>
+      <button class="btn btn-primary" id="rag-btn" onclick="runRAG()">▶ Process Conversations</button>
+    </div>
+
+    <div class="progress" id="rag-prog" style="display:none">
+      <div class="progress-fill" id="rag-fill" style="width:0%"></div>
+    </div>
+
+    <div class="info-box" id="rag-info">
+      <span style="font-size:20px">💡</span>
+      <div>Click <strong>Process Conversations</strong> to analyze your CSV. Claude will read through all conversations chronologically, detect when topics shift, and generate a summary for each topic segment and every 100 messages.</div>
+    </div>
+
+    <div class="grid2">
+      <!-- Topic Checkpoints -->
+      <div class="card">
+        <div class="card-head">
+          <span class="card-icon">📌</span>
+          <span class="card-title">Topic Checkpoints</span>
+          <span class="pill" id="topic-count">0</span>
+        </div>
+        <div class="scroll-list" id="topic-list">
+          <div class="empty-state">Topic checkpoints appear after processing.</div>
+        </div>
+      </div>
+      <!-- 100-msg Checkpoints -->
+      <div class="card">
+        <div class="card-head">
+          <span class="card-icon">📊</span>
+          <span class="card-title">100-Message Checkpoints</span>
+          <span class="pill" id="chunk-count">0</span>
+        </div>
+        <div class="scroll-list" id="chunk-list">
+          <div class="empty-state">Summaries generated every 100 messages.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Query -->
+    <div class="card">
+      <div class="card-head">
+        <span class="card-icon">🔍</span>
+        <span class="card-title">Query the RAG System</span>
+      </div>
+      <div class="query-row">
+        <input id="rag-q" placeholder="e.g. What cities did the user mention? What are their hobbies?" onkeydown="if(event.key==='Enter')queryRAG()"/>
+        <button class="btn btn-cyan" id="rag-ask-btn" onclick="queryRAG()">Ask</button>
+      </div>
+      <div id="rag-thinking" class="thinking" style="display:none"><div class="dot-spin"></div><span>Searching knowledge base…</span></div>
+      <div id="rag-answer" style="display:none" class="answer-box">
+        <div class="answer-label">Answer</div>
+        <div class="answer-text" id="rag-ans-text"></div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Persona Panel -->
+  <main id="persona-panel" class="panel" style="display:none">
+    <div class="sec-head">
+      <div>
+        <div class="sec-title">User Persona Extraction</div>
+        <div class="sec-desc">Analyzes User 1's messages across all conversations to build a structured profile.</div>
+      </div>
+      <button class="btn btn-primary" id="persona-btn" onclick="extractPersona()">🧠 Extract Persona</button>
+    </div>
+    <div class="info-box" id="persona-info">
+      <span style="font-size:20px">🔎</span>
+      <div>Click <strong>Extract Persona</strong> to analyze User 1's messages and build a structured profile covering habits, personality traits, interests, and communication style.</div>
+    </div>
+    <div id="persona-loading" class="load-card" style="display:none">
+      <div class="dot-spin" style="width:24px;height:24px;border-width:3px"></div>
+      <div>
+        <div style="font-weight:600;color:var(--text)">Analyzing conversation patterns…</div>
+        <div style="font-size:13px;color:var(--muted);margin-top:4px" id="persona-sub">Reading User 1 messages…</div>
+      </div>
+    </div>
+    <div id="persona-result" style="display:none"></div>
+  </main>
+
+  <!-- Chat Panel -->
+  <main id="chat-panel" class="panel" style="display:none;padding:0">
+    <div class="chat-wrap">
+      <div class="chat-top">
+        <div class="chat-ava">◈</div>
+        <div>
+          <div class="chat-name">ConvoRAG Assistant</div>
+          <div class="chat-status" id="chat-status">Ready • Use RAG + Persona tabs first for best results</div>
+        </div>
+      </div>
+      <div class="chat-msgs" id="chat-msgs">
+        <div class="welcome">
+          <div class="welcome-title">Ask me anything about this user</div>
+          <div class="welcome-sub">I use your RAG knowledge base + persona data to answer questions.</div>
+          <div class="chips">
+            <div class="chip" onclick="setChat(this)">What kind of person is this user?</div>
+            <div class="chip" onclick="setChat(this)">What are their hobbies and interests?</div>
+            <div class="chip" onclick="setChat(this)">How do they communicate?</div>
+            <div class="chip" onclick="setChat(this)">What are their habits?</div>
+            <div class="chip" onclick="setChat(this)">What topics did they discuss most?</div>
+            <div class="chip" onclick="setChat(this)">Describe their personality</div>
+          </div>
+        </div>
+      </div>
+      <div class="chat-bar">
+        <input id="chat-in" placeholder="Ask about this user…" onkeydown="if(event.key==='Enter')sendChat()"/>
+        <button class="send-btn" id="send-btn" onclick="sendChat()">➤</button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+const API = "http://localhost:5000/api";
+
+// ─── State ────────────────────────────────────────────────────────────────────
+let topicCheckpoints = [];
+let chunk100Summaries = [];
+let persona = null;
+let chatHistory = [];
+let ragRunning = false;
+
+// ─── Tab switching ─────────────────────────────────────────────────────────
+function setTab(tab) {
+  ['rag','persona','chat'].forEach(t => {
+    document.getElementById(t+'-panel').style.display = t === tab ? (t === 'chat' ? 'flex' : 'flex') : 'none';
+    document.getElementById(t+'-panel').classList.toggle('active', t === tab);
+  });
+  document.querySelectorAll('.nav-btn').forEach((b,i) => b.classList.toggle('active', ['rag','persona','chat'][i] === tab));
+  updateChatStatus();
+}
+
+// ─── Load info on startup ──────────────────────────────────────────────────
+async function loadInfo() {
+  try {
+    const r = await fetch(API + '/info');
+    const d = await r.json();
+    document.getElementById('stats-bar').textContent =
+      `${d.total_messages.toLocaleString()} msgs · ${d.total_days.toLocaleString()} days · ${d.topic_segments} segments`;
+    document.getElementById('rag-desc').textContent =
+      `Processing ${d.topic_segments} segments across ${d.total_messages.toLocaleString()} messages from ${d.total_days.toLocaleString()} days.`;
+    document.getElementById('persona-sub').textContent = `Reading ${d.persona_messages} User 1 messages…`;
+  } catch(e) {
+    document.getElementById('stats-bar').textContent = 'Cannot connect to backend — is app.py running?';
+    document.getElementById('stats-bar').style.color = '#ef4444';
+  }
+}
+loadInfo();
+
+// ─── RAG Processing ────────────────────────────────────────────────────────
+async function runRAG() {
+  if (ragRunning) return;
+  ragRunning = true;
+  topicCheckpoints = [];
+  chunk100Summaries = [];
+  document.getElementById('rag-btn').disabled = true;
+  document.getElementById('rag-btn').textContent = 'Processing…';
+  document.getElementById('rag-info').style.display = 'none';
+  document.getElementById('rag-prog').style.display = 'block';
+  document.getElementById('topic-list').innerHTML = '';
+  document.getElementById('chunk-list').innerHTML = '';
+
+  // Fetch segments and chunks from backend
+  const [segRes, chunkRes] = await Promise.all([
+    fetch(API + '/segments').then(r => r.json()),
+    fetch(API + '/chunks100').then(r => r.json()),
+  ]);
+
+  const total = segRes.length + chunkRes.length;
+  let done = 0;
+
+  // Process topic segments
+  let prevTopic = 'none';
+  for (const seg of segRes) {
+    try {
+      const r = await fetch(API + '/process_segment', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ segment: seg, prev_topic: prevTopic })
+      });
+      const p = await r.json();
+      prevTopic = p.topic;
+
+      if (p.changed || topicCheckpoints.length === 0) {
+        topicCheckpoints.push({ id: topicCheckpoints.length, topic: p.topic, start: seg.start, end: seg.end, summary: p.summary });
+      } else {
+        const last = topicCheckpoints[topicCheckpoints.length - 1];
+        last.end = seg.end;
+        if (last.summary.length < 500) last.summary += ' ' + p.summary;
+      }
+      renderTopics();
+    } catch(e) { console.error(e); }
+    done++;
+    setProgress(done / total * 100);
+  }
+
+  // Process 100-msg chunks
+  for (const chunk of chunkRes) {
+    try {
+      const r = await fetch(API + '/summarize_chunk', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ chunk })
+      });
+      const d = await r.json();
+      chunk100Summaries.push({ id: chunk.id, start: chunk.start, end: chunk.end, summary: d.summary });
+      renderChunks();
+    } catch(e) { console.error(e); }
+    done++;
+    setProgress(done / total * 100);
+  }
+
+  ragRunning = false;
+  document.getElementById('rag-btn').disabled = false;
+  document.getElementById('rag-btn').textContent = '↺ Re-process';
+  setProgress(100);
+  updateChatStatus();
+}
+
+function setProgress(pct) {
+  document.getElementById('rag-fill').style.width = pct + '%';
+}
+
+function renderTopics() {
+  const list = document.getElementById('topic-list');
+  list.innerHTML = '';
+  document.getElementById('topic-count').textContent = topicCheckpoints.length;
+  topicCheckpoints.forEach((t, i) => {
+    const el = document.createElement('div');
+    el.className = 'list-item';
+    el.innerHTML = `
+      <div class="item-head">
+        <span class="badge badge-purple">Topic ${t.id+1}</span>
+        <span class="msg-range">msgs ${t.start}–${t.end}</span>
+      </div>
+      <div class="item-title">${t.topic}</div>
+      <div class="item-body" style="display:none">${t.summary}</div>`;
+    el.onclick = () => {
+      const body = el.querySelector('.item-body');
+      const open = body.style.display !== 'none';
+      body.style.display = open ? 'none' : 'block';
+      el.classList.toggle('open', !open);
+    };
+    list.appendChild(el);
+  });
+}
+
+function renderChunks() {
+  const list = document.getElementById('chunk-list');
+  list.innerHTML = '';
+  document.getElementById('chunk-count').textContent = chunk100Summaries.length;
+  chunk100Summaries.forEach((c, i) => {
+    const el = document.createElement('div');
+    el.className = 'list-item';
+    el.innerHTML = `
+      <div class="item-head">
+        <span class="badge badge-cyan">Block ${c.id+1}</span>
+        <span class="msg-range">msgs ${c.start}–${c.end}</span>
+      </div>
+      <div class="item-body" style="display:none">${c.summary}</div>`;
+    el.onclick = () => {
+      const body = el.querySelector('.item-body');
+      const open = body.style.display !== 'none';
+      body.style.display = open ? 'none' : 'block';
+      el.classList.toggle('open', !open);
+    };
+    list.appendChild(el);
+  });
+}
+
+// ─── RAG Query ─────────────────────────────────────────────────────────────
+async function queryRAG() {
+  const q = document.getElementById('rag-q').value.trim();
+  if (!q) return;
+  document.getElementById('rag-thinking').style.display = 'flex';
+  document.getElementById('rag-answer').style.display = 'none';
+  document.getElementById('rag-ask-btn').disabled = true;
+
+  try {
+    const r = await fetch(API + '/query', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ query: q, topic_checkpoints: topicCheckpoints, chunk_summaries: chunk100Summaries })
+    });
+    const d = await r.json();
+    document.getElementById('rag-ans-text').textContent = d.answer || d.error;
+    document.getElementById('rag-answer').style.display = 'block';
+  } catch(e) {
+    document.getElementById('rag-ans-text').textContent = 'Error: ' + e.message;
+    document.getElementById('rag-answer').style.display = 'block';
+  }
+  document.getElementById('rag-thinking').style.display = 'none';
+  document.getElementById('rag-ask-btn').disabled = false;
+}
+
+// ─── Persona ───────────────────────────────────────────────────────────────
+async function extractPersona() {
+  document.getElementById('persona-btn').disabled = true;
+  document.getElementById('persona-info').style.display = 'none';
+  document.getElementById('persona-loading').style.display = 'flex';
+  document.getElementById('persona-result').style.display = 'none';
+
+  try {
+    const r = await fetch(API + '/extract_persona', { method: 'POST', headers: {'Content-Type':'application/json'}, body: '{}' });
+    const d = await r.json();
+    persona = d;
+    renderPersona(d);
+  } catch(e) {
+    document.getElementById('persona-result').innerHTML = `<div class="card" style="border-color:#ef4444;color:#f87171">Error: ${e.message}</div>`;
+    document.getElementById('persona-result').style.display = 'block';
+  }
+  document.getElementById('persona-loading').style.display = 'none';
+  document.getElementById('persona-btn').disabled = false;
+  document.getElementById('persona-btn').textContent = '↺ Re-extract';
+  updateChatStatus();
+}
+
+function renderPersona(p) {
+  const result = document.getElementById('persona-result');
+  if (p._error) { result.innerHTML = `<div class="card" style="border-color:#ef4444;color:#f87171">Error: ${p._error}</div>`; result.style.display='block'; return; }
+
+  const listItems = (arr, color) => (arr||[]).map(i => `<li><span class="dot" style="background:${color}"></span>${esc(i)}</li>`).join('');
+  const tags = (arr) => (arr||[]).map(t => `<span class="tag">${esc(t)}</span>`).join('');
+  const chips = (obj) => ['tone','message_length','emoji_usage'].filter(k=>obj[k]).map(k =>
+    `<div class="comm-chip"><div class="comm-key">${k.replace('_',' ')}</div><div class="comm-val">${esc(obj[k])}</div></div>`).join('');
+
+  result.innerHTML = `
+    ${p.summary ? `<div class="persona-banner">
+      <div class="banner-label">👤 User Portrait</div>
+      <div class="banner-text">${esc(p.summary)}</div>
+      ${p.life_situation ? `<div class="banner-life"><strong>Life situation:</strong> ${esc(p.life_situation)}</div>` : ''}
+    </div>` : ''}
+    <div class="persona-grid">
+      <div class="p-card" style="border-color:#5b6ef4">
+        <div class="p-card-title">🔄 Habits</div>
+        <ul class="p-list">${listItems(p.habits,'#5b6ef4')}</ul>
+      </div>
+      <div class="p-card" style="border-color:#06b6d4">
+        <div class="p-card-title">📋 Personal Facts</div>
+        <ul class="p-list">${listItems(p.personal_facts,'#06b6d4')}</ul>
+      </div>
+      <div class="p-card" style="border-color:#10b981">
+        <div class="p-card-title">✨ Personality</div>
+        <ul class="p-list">${listItems(p.personality_traits,'#10b981')}</ul>
+      </div>
+      <div class="p-card" style="border-color:#f59e0b">
+        <div class="p-card-title">🎯 Interests</div>
+        <ul class="p-list">${listItems(p.interests,'#f59e0b')}</ul>
+      </div>
+    </div>
+    ${p.communication_style ? `
+    <div class="p-card" style="border-color:#8b5cf6;margin-top:0">
+      <div class="p-card-title">💬 Communication Style</div>
+      <div class="comm-row">${chips(p.communication_style)}</div>
+      <div class="tags">${tags(p.communication_style.patterns)}</div>
+    </div>` : ''}
+  `;
+  result.style.display = 'flex';
+  result.style.flexDirection = 'column';
+  result.style.gap = '14px';
+}
+
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ─── Chat ─────────────────────────────────────────────────────────────────
+function setChat(el) {
+  document.getElementById('chat-in').value = el.textContent;
+}
+
+function updateChatStatus() {
+  const s = document.getElementById('chat-status');
+  if (!s) return;
+  const parts = [];
+  parts.push(persona ? '✓ Persona ready' : '⚠ Extract persona first');
+  parts.push(topicCheckpoints.length ? `✓ ${topicCheckpoints.length} topics indexed` : '⚠ Run RAG processing');
+  s.textContent = parts.join(' · ');
+}
+
+async function sendChat() {
+  const input = document.getElementById('chat-in');
+  const msg = input.value.trim();
+  if (!msg) return;
+  input.value = '';
+  document.getElementById('send-btn').disabled = true;
+
+  chatHistory.push({ role: 'user', content: msg });
+  appendMsg('user', msg);
+  const typing = appendTyping();
+
+  try {
+    const r = await fetch(API + '/chat', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ messages: chatHistory, persona: persona||{}, topic_checkpoints: topicCheckpoints, chunk_summaries: chunk100Summaries })
+    });
+    const d = await r.json();
+    const reply = d.reply || d.error || 'No response';
+    typing.remove();
+    chatHistory.push({ role: 'assistant', content: reply });
+    appendMsg('bot', reply);
+  } catch(e) {
+    typing.remove();
+    appendMsg('bot', 'Error: ' + e.message);
+  }
+  document.getElementById('send-btn').disabled = false;
+  scrollMsgs();
+}
+
+function appendMsg(role, text) {
+  const msgs = document.getElementById('chat-msgs');
+  const d = document.createElement('div');
+  d.className = 'msg ' + (role === 'user' ? 'user' : '');
+  d.innerHTML = role === 'user'
+    ? `<div class="bubble user">${esc(text)}</div>`
+    : `<div class="msg-ava">◈</div><div class="bubble bot">${esc(text)}</div>`;
+  msgs.appendChild(d);
+  scrollMsgs();
+  return d;
+}
+
+function appendTyping() {
+  const msgs = document.getElementById('chat-msgs');
+  const d = document.createElement('div');
+  d.className = 'msg';
+  d.innerHTML = `<div class="msg-ava">◈</div><div class="typing"><span></span><span></span><span></span></div>`;
+  msgs.appendChild(d);
+  scrollMsgs();
+  return d;
+}
+
+function scrollMsgs() {
+  const msgs = document.getElementById('chat-msgs');
+  msgs.scrollTop = msgs.scrollHeight;
+}
+</script>
+</body>
+</html>
