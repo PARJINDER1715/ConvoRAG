@@ -435,7 +435,8 @@ Answer questions about who they are, their habits, personality, and communicatio
 # ──────────────────────────────────────────────────────────────────────────────
 # Run
 # ──────────────────────────────────────────────────────────────────────────────
-
 if __name__ == "__main__":
-    print("\n🚀 ConvoRAG running at http://localhost:5000\n")
-    app.run(debug=True, port=5000)
+    app.run(
+        host="0.0.0.0",
+        port=int(os.environ.get("PORT", 5000))
+    )
